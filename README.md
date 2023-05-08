@@ -13,6 +13,7 @@ Requirements:
 # Usage
 We provide script which builds graph, run queries and parses the result. All results can be found on folders **result/ggnn_single_batch**, **result/ggnn_whole_batch** in csv format.
 
+```shell
 $ git clone https://github.com/SNU-ARC/ggnn
 $ cd ggnn/
 $ git checkout ADA-NNS
@@ -21,3 +22,4 @@ $ ./script/run.sh
 $ mv result/single_* result/single
 $ mv result/whole_* result/whole
 $ python ./script/parse.py
+```

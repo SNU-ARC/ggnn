@@ -30,14 +30,14 @@ limitations under the License.
 
 DEFINE_string(base_filename, "", "path to file with base vectors");
 DEFINE_string(query_filename, "", "path to file with perform_query vectors");
-DEFINE_string(groundtruth_filename, "",
+DEFINE_string(groundtruth_filename, "../graphs/sift1m.graph",
               "path to file with groundtruth vectors");
 DEFINE_string(graph_filename, "",
               "path to file that contains the serialized graph");
 DEFINE_double(tau, 0.5, "Parameter tau");
 DEFINE_int32(refinement_iterations, 2, "Number of refinement iterations");
 DEFINE_int32(gpu_id, 0, "GPU id");
-DEFINE_bool(grid_search, false,
+DEFINE_bool(grid_search, true, // false,
             "Perform queries for a wide range of parameters.");
 
 int main(int argc, char* argv[]) {
@@ -82,14 +82,14 @@ int main(int argc, char* argv[]) {
   // dataset configuration (here: SIFT1M)
   //
   /// dimension of the dataset
-  const int D = 128;
+const int D = 256;
   /// distance measure (Euclidean or Cosine)
   const DistanceMeasure measure = Euclidean;
   //
   // search-graph configuration
   //
   /// number of neighbors per point in the graph
-  const int KBuild = 24;
+  const int KBuild = 40;
   /// maximum number of inverse/symmetric links (KBuild / 2 usually works best)
   const int KF = KBuild / 2;
   /// segment/batch size (needs to be > KBuild-KF)
@@ -100,10 +100,9 @@ int main(int argc, char* argv[]) {
   // query configuration
   //
   /// number of neighbors to search for
-  const int KQuery = 10;
+const int KQuery = 10;
 
-  static_assert(KBuild - KF < S,
-                "there are not enough points to fill the local neighbor list!");
+  static_assert(KBuild - KF < S, "there are not enough points to fill the local neighbor list!");
 
   LOG(INFO) << "Using the following parameters " << KBuild << " (KBuild) " << KF
             << " (KF) " << S << " (S) " << L << " (L) " << D << " (D) ";
@@ -129,53 +128,39 @@ int main(int argc, char* argv[]) {
 
   m_ggnn.ggnnMain(FLAGS_graph_filename, FLAGS_refinement_iterations);
 
-  const float tau_query = 0.0f;
-  cudaMemcpyToSymbol(c_tau_query, &tau_query, sizeof(float));
+  auto query_function = [&m_ggnn](const float tau_query) {
+    cudaMemcpyToSymbol(c_tau_query, &tau_query, sizeof(float));
+    LOG(INFO) << "--";
+    LOG(INFO) << "Query with tau_query " << tau_query;
+    // faster for C@1 = 99%
+    //LOG(INFO) << "fast query (good for C@1)";
+    //m_ggnn.queryLayer<32, 200, 256, 64>();
+    // better for C@10 > 99%
+    LOG(INFO) << "regular query (good for C@10)";
+    m_ggnn.queryLayer<32, 400, 448, 64>();
+    // m_ggnn.queryLayer<64, 400, 448, 64>();
+    // expensive, can get to 99.99% C@10
+    // m_ggnn.queryLayer<128, 2000, 2048, 256>();
+  };
 
-#define QUERY_BEST_SIZE(best_size)                              \
-  {                                                             \
-    LOG(INFO) << "Query with best size " << best_size;          \
-    m_ggnn.noSlackQueryLayer<32, 400, 448 + best_size - 10,     \
-                             64 + best_size - 10, best_size>(); \
+  if (FLAGS_grid_search) {
+    LOG(INFO) << "--";
+    LOG(INFO) << "grid-search:";
+    for (int i = 1; i <= 20; ++i) query_function(i * 0.05f);
+    //for (int i = 0; i < 70; ++i) query_function(i * 0.01f);
+    //for (int i = 7; i <= 20; ++i) query_function(i * 0.1f);
+  } else {  // by default, just execute a few queries
+    LOG(INFO) << "--";
+    LOG(INFO) << "90, 95, 99% R@1, 99% C@10 (using -tau 0.5 "
+                 "-refinement_iterations 2):";
+    query_function(0.34f);
+    query_function(0.41f);
+    query_function(0.51f);
+    query_function(0.64f);
   }
-  QUERY_BEST_SIZE(10);
-  QUERY_BEST_SIZE(20);
-  QUERY_BEST_SIZE(30);
-  QUERY_BEST_SIZE(40);
-  QUERY_BEST_SIZE(50);
-  QUERY_BEST_SIZE(60);
-  QUERY_BEST_SIZE(70);
-  QUERY_BEST_SIZE(80);
-  QUERY_BEST_SIZE(90);
-  QUERY_BEST_SIZE(100);
-  QUERY_BEST_SIZE(110);
-  QUERY_BEST_SIZE(120);
-  QUERY_BEST_SIZE(130);
-  QUERY_BEST_SIZE(140);
-  QUERY_BEST_SIZE(150);
-  QUERY_BEST_SIZE(160);
-  QUERY_BEST_SIZE(170);
-  QUERY_BEST_SIZE(180);
-  QUERY_BEST_SIZE(190);
-  QUERY_BEST_SIZE(200);
-  QUERY_BEST_SIZE(220);
-  QUERY_BEST_SIZE(240);
-  QUERY_BEST_SIZE(260);
-  QUERY_BEST_SIZE(280);
-  QUERY_BEST_SIZE(300);
-  QUERY_BEST_SIZE(320);
-  QUERY_BEST_SIZE(340);
-  QUERY_BEST_SIZE(360);
-  QUERY_BEST_SIZE(380);
-  QUERY_BEST_SIZE(400);
-  QUERY_BEST_SIZE(450);
-  QUERY_BEST_SIZE(500);
-  QUERY_BEST_SIZE(550);
-  QUERY_BEST_SIZE(600);
-  QUERY_BEST_SIZE(700);
-  QUERY_BEST_SIZE(800);
 
   printf("done! \n");
   gflags::ShutDownCommandLineFlags();
   return 0;
 }
+

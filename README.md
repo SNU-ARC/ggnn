@@ -11,7 +11,7 @@ Requirements:
 * libgflags-dev (`sudo apt install libgflags-dev`)
 
 # Usage
-We provide script which builds graph, run queries and parses the result. For SIFT1M, DEEP1M, GLOVE-100, MSONG datasets we used parameters of SIFT1M, and for GIST1M and CRAWL we used parameters for GIST1M. All results can be found on folders **result/ggnn_single_batch**, **result/ggnn_whole_batch** in csv format.
+We provide script which run queries and parses the result. For SIFT1M, DEEP1M, GLOVE-100, MSONG datasets we used parameters of SIFT1M, and for GIST1M and CRAWL we used parameters for GIST1M. All results can be found on folders **result/ggnn_single_batch**, **result/ggnn_whole_batch** in csv format.
 
 ```shell
 $ git clone https://github.com/SNU-ARC/ggnn
